@@ -1,4 +1,5 @@
 // .gitignore for Openrouter SwiftUI project
+# .gitignore for Openrouter SwiftUI project
 
 # Xcode build artefacts
 build/
