@@ -1,1 +1,60 @@
-.aider*
+// .gitignore for Openrouter SwiftUI project
+
+# Xcode build artefacts
+build/
+DerivedData/
+*.xcworkspace
+*.xcuserdata
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/xcshareddata/**
+
+# User-specific files
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.hmap
+*.ipa
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# macOS Finder metadata
+.DS_Store
+
+# SwiftData SQLite files (local persistence)
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Secrets & environment files
+*.env
+secrets.json
+api_keys.json
+
+# IDE settings
+.vscode/
+.idea/
