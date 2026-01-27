@@ -1,5 +1,4 @@
-// .gitignore for Openrouter SwiftUI project
-# .gitignore for Openrouter SwiftUI project
+# Openrouter SwiftUI .gitignore
 
 # Xcode build artefacts
 build/
@@ -59,3 +58,4 @@ api_keys.json
 # IDE settings
 .vscode/
 .idea/
+.aider*
