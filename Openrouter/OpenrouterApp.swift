@@ -1,4 +1,3 @@
-//
 //  OpenrouterApp.swift
 //  Openrouter
 //
@@ -10,6 +9,7 @@ import SwiftData
 
 @main
 struct OpenrouterApp: App {
+    // Shared model container
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             AIModel.self,
@@ -37,19 +37,43 @@ struct OpenrouterApp: App {
         }
     }()
 
+    // Global app state
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appState)               // Inject AppState into the environment
                 .task {
-                    // Import models on first launch
-                    do {
-                        let importService = ModelImportService()
-                        try await importService.importModels(into: sharedModelContainer.mainContext)
-                    } catch {
-                        print("Failed to import models: \(error)")
-                    }
+                    // Provide the model container to AppState (if needed later)
+                    appState.setModelContainer(sharedModelContainer)
+
+                    // Perform a one‑time model import
+                    await importModelsIfNeeded()
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    // MARK: - Model Import Helper
+
+    /// Imports the bundled model catalog only once. Subsequent launches skip the import.
+    private func importModelsIfNeeded() async {
+        // Check UserDefaults flag to avoid duplicate imports
+        let hasImported = UserDefaults.standard.bool(forKey: "hasImportedModels")
+        guard !hasImported else { return }
+
+        appState.isImportingModels = true
+        do {
+            let importService = ModelImportService()
+            try await importService.importModels(into: sharedModelContainer.mainContext)
+
+            // Mark import as completed
+            UserDefaults.standard.set(true, forKey: "hasImportedModels")
+        } catch {
+            // Propagate error to UI via AppState
+            appState.importError = error.localizedDescription
+        }
+        appState.isImportingModels = false
     }
 }
