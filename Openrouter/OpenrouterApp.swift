@@ -7,6 +7,12 @@
 import SwiftUI
 import SwiftData
 
+// Import services
+import OSLog
+
+// Import error types
+import Foundation
+
 @main
 struct OpenrouterApp: App {
     // Shared model container
@@ -61,16 +67,40 @@ struct OpenrouterApp: App {
     private func importModelsIfNeeded() async {
         appState.isImportingModels = true
         do {
-            let importService = ModelImportService()
+            // Get API key for model import
+            guard let apiKey = try? KeychainManager.shared.getAPIKey() else {
+                print("No API key available for model import - skipping")
+                appState.importError = "No API key configured. Please set up your API key in Settings."
+                appState.isImportingModels = false
+                return
+            }
+
+            let client = OpenRouterClient(
+                apiKey: apiKey,
+                appReferrer: appState.appReferrer,
+                appTitle: appState.appTitle
+            )
+            let importService = ModelImportService(client: client)
             let newModelNames = try await importService.importModels(into: sharedModelContainer.mainContext)
 
             // Show notification for new models
             if !newModelNames.isEmpty {
                 appState.handleNewModels(newModelNames)
             }
+        } catch let error as OpenRouterError {
+            // Handle specific OpenRouter errors with user-friendly messages
+            print("Model import failed: \(error)")
+            var errorMessage = error.localizedDescription
+
+            if let recoverySuggestion = error.recoverySuggestion {
+                errorMessage += "\n\n\(recoverySuggestion)"
+            }
+
+            appState.importError = errorMessage
         } catch {
-            // Propagate error to UI via AppState
-            appState.importError = error.localizedDescription
+            // Fallback for other errors
+            print("Model import failed: \(error)")
+            appState.importError = "Failed to import models: \(error.localizedDescription)"
         }
         appState.isImportingModels = false
     }

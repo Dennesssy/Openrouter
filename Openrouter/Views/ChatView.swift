@@ -220,7 +220,11 @@ struct ChatView: View {
 
         Task {
             do {
-                let client = OpenRouterClient(apiKey: apiKey)
+                let client = OpenRouterClient(
+                    apiKey: apiKey,
+                    appReferrer: "https://github.com/dennismayr/openrouter-swiftui-app",
+                    appTitle: "OpenRouter SwiftUI App"
+                )
 
                 let response = try await client.sendChat(
                     model: model.id,
@@ -237,21 +241,37 @@ struct ChatView: View {
                         tokenCount: response.usage.completion_tokens
                     )
 
-                    // Calculate actual cost using API response tokens
-                    if let pricing = model.pricing {
-                        // Use the actual tokens from the response
-                        let promptTokens = response.usage.prompt_tokens
-                        let completionTokens = response.usage.completion_tokens
+                    // Use detailed cost information from API response
+                    let promptTokens = response.usage.prompt_tokens
+                    let completionTokens = response.usage.completion_tokens
 
+                    // Prefer API-provided cost over local calculation
+                    if let apiCost = response.usage.cost {
+                        assistantMessage.cost = apiCost
+                        print("Using API-provided cost: $\(apiCost)")
+                    } else if let pricing = model.pricing {
+                        // Fallback to local calculation if API doesn't provide cost
                         assistantMessage.cost = pricing.calculateCost(
                             promptTokens: promptTokens,
                             completionTokens: completionTokens
                         )
+                        print("Using locally calculated cost: $\(assistantMessage.cost)")
+                    }
 
-                        // Update session totals
-                        session.totalPromptTokens += promptTokens
-                        session.totalCompletionTokens += completionTokens
-                        session.totalCost += assistantMessage.cost
+                    // Update session totals with detailed token breakdown
+                    session.totalPromptTokens += promptTokens
+                    session.totalCompletionTokens += completionTokens
+                    session.totalCost += assistantMessage.cost
+
+                    // Log detailed usage information
+                    if let promptDetails = response.usage.prompt_tokens_details {
+                        print("Prompt token breakdown - Cached: \(promptDetails.cached_tokens ?? 0), Audio: \(promptDetails.audio_tokens ?? 0), Video: \(promptDetails.video_tokens ?? 0)")
+                    }
+                    if let completionDetails = response.usage.completion_tokens_details {
+                        print("Completion token breakdown - Reasoning: \(completionDetails.reasoning_tokens ?? 0), Images: \(completionDetails.image_tokens ?? 0)")
+                    }
+                    if let costDetails = response.usage.cost_details {
+                        print("Cost breakdown - Input: $\(costDetails.upstream_inference_input_cost ?? 0), Output: $\(costDetails.upstream_inference_output_cost ?? 0)")
                     }
 
                     await MainActor.run {
