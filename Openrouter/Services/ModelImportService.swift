@@ -11,15 +11,13 @@ import SwiftData
 class ModelImportService {
     private let jsonURL = URL(fileURLWithPath: "/Users/denn/Kaggle/openrouter_models.json")
 
-    func importModels(into context: ModelContext) async throws {
-        // Check if models are already imported
-        let existingCount = try context.fetchCount(FetchDescriptor<AIModel>())
-        if existingCount > 0 {
-            print("Models already imported (\(existingCount) models)")
-            return
-        }
-
+    func importModels(into context: ModelContext) async throws -> [String] {
         print("Starting model import...")
+
+        // Get existing model IDs
+        let existingModels = try context.fetch(FetchDescriptor<AIModel>())
+        let existingModelIds = Set(existingModels.map { $0.id })
+        print("Found \(existingModelIds.count) existing models")
 
         // Read JSON data
         let jsonData = try Data(contentsOf: jsonURL)
@@ -30,14 +28,22 @@ class ModelImportService {
 
         print("Found \(dtos.count) models in JSON")
 
+        var newModelNames: [String] = []
+
         // Transform and save models
         for dto in dtos {
-            let model = try transformDTO(dto)
-            context.insert(model)
+            if !existingModelIds.contains(dto.id) {
+                let model = try transformDTO(dto)
+                context.insert(model)
+                newModelNames.append(model.name)
+                print("New model: \(model.name)")
+            }
         }
 
         try context.save()
-        print("Successfully imported \(dtos.count) models")
+        print("Import complete. \(newModelNames.count) new models added")
+
+        return newModelNames
     }
 
     private func transformDTO(_ dto: OpenRouterModelDTO) throws -> AIModel {
@@ -87,7 +93,7 @@ class ModelImportService {
             huggingFaceId: dto.hugging_face_id,
             name: dto.name,
             created: createdDate,
-            description: dto.description,
+            modelDescription: dto.description,
             contextLength: dto.context_length,
             perRequestLimits: dto.per_request_limits,
             supportedParameters: dto.supported_parameters,

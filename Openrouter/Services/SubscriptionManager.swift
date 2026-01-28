@@ -19,8 +19,8 @@ class SubscriptionManager: NSObject, ObservableObject {
     private var updatesTask: Task<Void, Never>?
 
     // Product IDs
-    private let monthlyProductId = "com.openrouter.premium.monthly"
-    private let yearlyProductId = "com.openrouter.premium.yearly"
+    let monthlyProductId = "com.openrouter.premium.monthly"
+    let yearlyProductId = "com.openrouter.premium.yearly"
 
     override init() {
         super.init()
@@ -43,16 +43,19 @@ class SubscriptionManager: NSObject, ObservableObject {
                 let statuses = try await product.subscription?.status ?? []
                 subscriptionStatus = statuses.first
 
-                // Update subscription status based on current entitlements
-                let currentEntitlements = await Transaction.currentEntitlements
-                isSubscribed = currentEntitlements.contains { transaction in
+                // Update subscription status based on current entitlements (async sequence)
+                var subscribed = false
+                for await transaction in Transaction.currentEntitlements {
                     switch transaction {
-                    case .verified(let transaction):
-                        return transaction.productID == monthlyProductId || transaction.productID == yearlyProductId
+                    case .verified(let txn):
+                        if txn.productID == monthlyProductId || txn.productID == yearlyProductId {
+                            subscribed = true
+                        }
                     case .unverified:
-                        return false
+                        continue
                     }
                 }
+                isSubscribed = subscribed
             } catch {
                 print("Error checking subscription status: \(error)")
             }

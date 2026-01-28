@@ -15,7 +15,7 @@ final class AIModel {
     var huggingFaceId: String?
     var name: String
     var created: Date?
-    var description: String
+    var modelDescription: String  // Renamed from `description`
     var contextLength: Int
     var perRequestLimits: String?
     var supportedParameters: [String]
@@ -33,7 +33,7 @@ final class AIModel {
         huggingFaceId: String? = nil,
         name: String,
         created: Date? = nil,
-        description: String,
+        modelDescription: String,  // Renamed parameter
         contextLength: Int,
         perRequestLimits: String? = nil,
         supportedParameters: [String] = [],
@@ -44,7 +44,7 @@ final class AIModel {
         self.huggingFaceId = huggingFaceId
         self.name = name
         self.created = created
-        self.description = description
+        self.modelDescription = modelDescription  // Renamed assignment
         self.contextLength = contextLength
         self.perRequestLimits = perRequestLimits
         self.supportedParameters = supportedParameters

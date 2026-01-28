@@ -7,6 +7,9 @@
 
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
 
 struct ModelBrowserView: View {
     @Environment(\.modelContext) private var modelContext
@@ -24,7 +27,7 @@ struct ModelBrowserView: View {
             // Search filter
             let matchesSearch = searchText.isEmpty ||
                 model.name.localizedCaseInsensitiveContains(searchText) ||
-                model.description.localizedCaseInsensitiveContains(searchText) ||
+                model.modelDescription.localizedCaseInsensitiveContains(searchText) ||
                 model.id.localizedCaseInsensitiveContains(searchText)
 
             // Provider filter
@@ -88,7 +91,11 @@ struct ModelBrowserView: View {
                     }
                 }
                 .padding(.vertical)
+#if os(iOS)
                 .background(Color(.systemBackground))
+#else
+                .background(Color.gray.opacity(0.1))
+#endif
 
                 // Model List
                 List(filteredModels) { model in
@@ -99,7 +106,9 @@ struct ModelBrowserView: View {
                 .listStyle(.plain)
             }
             .navigationTitle("AI Models")
+#if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+#endif
         }
     }
 }
@@ -124,7 +133,7 @@ struct ModelRowView: View {
                 }
             }
 
-            Text(model.description)
+            Text(model.modelDescription)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .lineLimit(2)
@@ -148,7 +157,11 @@ struct ModelRowView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
+#if os(iOS)
                         .background(Color(.systemGray5))
+#else
+                        .background(Color.gray.opacity(0.15))
+#endif
                         .cornerRadius(4)
                 }
             }
@@ -233,7 +246,11 @@ struct FilterView: View {
             }
         }
         .padding()
+#if os(iOS)
         .background(Color(.systemGray6))
+#else
+        .background(Color.gray.opacity(0.2))
+#endif
         .cornerRadius(12)
     }
 }

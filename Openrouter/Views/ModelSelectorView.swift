@@ -7,6 +7,9 @@
 
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
 
 struct ModelSelectorView: View {
     @Environment(\.dismiss) private var dismiss
@@ -32,7 +35,7 @@ struct ModelSelectorView: View {
             // Search filter
             let matchesSearch = searchText.isEmpty ||
                 model.name.localizedCaseInsensitiveContains(searchText) ||
-                model.description.localizedCaseInsensitiveContains(searchText) ||
+                model.modelDescription.localizedCaseInsensitiveContains(searchText) ||
                 model.id.localizedCaseInsensitiveContains(searchText)
 
             // Provider filter
@@ -114,7 +117,27 @@ struct ModelSelectorView: View {
                     .padding(.horizontal)
                 }
                 .padding(.vertical)
-                .background(Color(.systemBackground))
+#if os(iOS)
+#if os(iOS)
+    #if os(iOS)
+            .background(Color(.systemBackground))
+#else
+            .background(Color.gray.opacity(0.1))
+#endif
+#else
+                .background(Color.gray.opacity(0.1))
+#endif
+#else
+#if os(iOS)
+    #if os(iOS)
+            .background(Color(.systemBackground))
+#else
+            .background(Color.gray.opacity(0.1))
+#endif
+#else
+                .background(Color.gray.opacity(0.1))
+#endif
+#endif
 
                 // Favorites Section (if any)
                 if !favoriteModels.isEmpty && selectedProvider == nil && searchText.isEmpty {
@@ -135,7 +158,11 @@ struct ModelSelectorView: View {
                         }
                     }
                     .padding(.vertical)
+#if os(iOS)
                     .background(Color(.systemGray6).opacity(0.5))
+#else
+                    .background(Color.gray.opacity(0.1))
+#endif
                 }
 
                 // Models List
@@ -148,6 +175,7 @@ struct ModelSelectorView: View {
                 .listStyle(.plain)
             }
             .navigationTitle("Select Model")
+#if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -156,6 +184,7 @@ struct ModelSelectorView: View {
                     }
                 }
             }
+#endif
         }
     }
 
@@ -176,7 +205,11 @@ struct FilterButton: View {
                 .font(.subheadline)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+#if os(iOS)
                 .background(isSelected ? Color.blue : Color(.systemGray5))
+#else
+                .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
+#endif
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(20)
         }
@@ -217,7 +250,11 @@ struct FavoriteModelCard: View {
             }
             .frame(width: 160)
             .padding()
+#if os(iOS)
             .background(Color(.systemBackground))
+#else
+            .background(Color.gray.opacity(0.1))
+#endif
             .cornerRadius(12)
             .shadow(radius: 2)
         }
@@ -245,7 +282,7 @@ struct ModelSelectorRowView: View {
                 }
             }
 
-            Text(model.description)
+            Text(model.modelDescription)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .lineLimit(2)
@@ -269,7 +306,11 @@ struct ModelSelectorRowView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
+#if os(iOS)
                         .background(Color(.systemGray5))
+#else
+                        .background(Color.gray.opacity(0.15))
+#endif
                         .cornerRadius(4)
                 }
             }

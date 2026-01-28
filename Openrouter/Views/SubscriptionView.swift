@@ -7,6 +7,9 @@
 
 import SwiftUI
 import StoreKit
+#if os(iOS)
+import UIKit
+#endif
 
 struct SubscriptionView: View {
     @Environment(\.dismiss) private var dismiss
@@ -52,7 +55,11 @@ struct SubscriptionView: View {
                                 .multilineTextAlignment(.center)
                         }
                         .padding()
+#if os(iOS)
                         .background(Color(.systemGray6))
+#else
+                        .background(Color.gray.opacity(0.2))
+#endif
                         .cornerRadius(12)
                         .padding(.horizontal)
                     } else {
@@ -107,14 +114,16 @@ struct SubscriptionView: View {
                 }
                 .padding(.bottom, 32)
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+#if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button("Done") {
+                dismiss()
             }
+        }
+    }
+#endif
             .task {
                 await loadProducts()
             }
@@ -133,6 +142,7 @@ struct SubscriptionView: View {
             }
         }
     }
+
 
     private func loadProducts() async {
         do {
@@ -203,7 +213,18 @@ struct SubscriptionOptionCard: View {
                     .fontWeight(.semibold)
 
                 if let subscription = product.subscription {
-                    Text(subscription.subscriptionPeriod.localizedDescription)
+                    Text({
+                        let period = subscription.subscriptionPeriod
+                        let unit: String
+                        switch period.unit {
+                        case .day: unit = period.value == 1 ? "day" : "days"
+                        case .week: unit = period.value == 1 ? "week" : "weeks"
+                        case .month: unit = period.value == 1 ? "month" : "months"
+                        case .year: unit = period.value == 1 ? "year" : "years"
+                        @unknown default: unit = "period"
+                        }
+                        return "\(period.value) \(unit)"
+                    }())
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -237,7 +258,15 @@ struct SubscriptionOptionCard: View {
                 .disabled(isPurchasing)
             }
             .padding()
+#if os(iOS)
             .background(Color(.systemBackground))
+#else
+#if os(iOS)
+            .background(Color(.systemBackground))
+#else
+            .background(Color.gray.opacity(0.1))
+#endif
+#endif
             .cornerRadius(16)
             .shadow(radius: 4)
             .overlay {

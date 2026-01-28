@@ -7,6 +7,9 @@
 
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
 
 struct ChatView: View {
     let session: ChatSession
@@ -55,7 +58,11 @@ struct ChatView: View {
                 }
             }
             .padding()
+#if os(iOS)
             .background(Color(.systemBackground))
+#else
+            .background(Color.gray.opacity(0.1))
+#endif
 
             Divider()
 
@@ -107,7 +114,11 @@ struct ChatView: View {
                     TextEditor(text: $messageText)
                         .frame(minHeight: 40, maxHeight: 120)
                         .padding(8)
+#if os(iOS)
                         .background(Color(.systemGray6))
+#else
+                        .background(Color.gray.opacity(0.2))
+#endif
                         .cornerRadius(12)
                         .onChange(of: messageText) { _ in
                             updateCostEstimation()
@@ -131,7 +142,9 @@ struct ChatView: View {
             }
             .padding()
         }
+#if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+#endif
         .onAppear {
             updateCostEstimation()
         }
@@ -175,9 +188,10 @@ struct ChatView: View {
 
         // Check budget limits before sending
         if let dailyBudget = userPreferences?.dailyBudgetLimit {
+            let today = DailyCostLog.startOfDay()
             let todayLogs = try? modelContext.fetch(
                 FetchDescriptor<DailyCostLog>(
-                    predicate: #Predicate { $0.date == DailyCostLog.startOfDay() }
+                    predicate: #Predicate { $0.date == today }
                 )
             )
             let todaySpent = todayLogs?.first?.totalSpent ?? 0
@@ -208,17 +222,9 @@ struct ChatView: View {
             do {
                 let client = OpenRouterClient(apiKey: apiKey)
 
-                // Convert session messages to API format
-                let apiMessages = session.messages.map { message in
-                    OpenRouterClient.ChatRequest.ChatMessage(
-                        role: message.role,
-                        content: message.content
-                    )
-                }
-
                 let response = try await client.sendChat(
                     model: model.id,
-                    messages: apiMessages,
+                    messages: session.messages,
                     maxTokens: userPreferences?.defaultMaxTokens,
                     temperature: userPreferences?.defaultTemperature
                 )
@@ -288,7 +294,7 @@ struct ChatView: View {
         )
 
         do {
-            var dailyLog = try modelContext.fetch(descriptor).first ?? DailyCostLog(date: today)
+            let dailyLog = try modelContext.fetch(descriptor).first ?? DailyCostLog(date: today)
 
             dailyLog.addCost(message.cost, forModel: modelId)
 
@@ -387,7 +393,11 @@ struct MessageView: View {
             }
         }
         .padding()
+#if os(iOS)
         .background(message.role == "user" ? Color.blue.opacity(0.1) : Color(.systemGray6))
+#else
+        .background(message.role == "user" ? Color.blue.opacity(0.1) : Color.gray.opacity(0.2))
+#endif
         .cornerRadius(12)
     }
 }

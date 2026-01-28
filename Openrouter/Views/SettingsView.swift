@@ -130,7 +130,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+#if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+#endif
             .onAppear {
                 loadPreferences()
             }
@@ -183,15 +185,14 @@ struct SettingsView: View {
             prefs.currencyCode = currencyCode
             prefs.isSubscribedToPremium = isSubscribedToPremium
         } else {
-            let newPrefs = UserPreferences(
-                isSubscribedToPremium: isSubscribedToPremium,
-                currencyCode: currencyCode,
-                dailyBudgetLimit: dailyBudgetLimit,
-                defaultTemperature: defaultTemperature,
-                defaultMaxTokens: defaultMaxTokens,
-                costLimitPerSession: costLimitPerSession,
-                showCostWarnings: showCostWarnings
-            )
+            let newPrefs = UserPreferences()
+            newPrefs.isSubscribedToPremium = isSubscribedToPremium
+            newPrefs.currencyCode = currencyCode
+            newPrefs.dailyBudgetLimit = dailyBudgetLimit
+            newPrefs.defaultTemperature = defaultTemperature
+            newPrefs.defaultMaxTokens = defaultMaxTokens
+            newPrefs.costLimitPerSession = costLimitPerSession
+            newPrefs.showCostWarnings = showCostWarnings
             modelContext.insert(newPrefs)
         }
 

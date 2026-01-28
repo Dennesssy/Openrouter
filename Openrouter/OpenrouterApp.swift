@@ -57,19 +57,17 @@ struct OpenrouterApp: App {
 
     // MARK: - Model Import Helper
 
-    /// Imports the bundled model catalog only once. Subsequent launches skip the import.
+    /// Imports the bundled model catalog. Detects and notifies about new models.
     private func importModelsIfNeeded() async {
-        // Check UserDefaults flag to avoid duplicate imports
-        let hasImported = UserDefaults.standard.bool(forKey: "hasImportedModels")
-        guard !hasImported else { return }
-
         appState.isImportingModels = true
         do {
             let importService = ModelImportService()
-            try await importService.importModels(into: sharedModelContainer.mainContext)
+            let newModelNames = try await importService.importModels(into: sharedModelContainer.mainContext)
 
-            // Mark import as completed
-            UserDefaults.standard.set(true, forKey: "hasImportedModels")
+            // Show notification for new models
+            if !newModelNames.isEmpty {
+                appState.handleNewModels(newModelNames)
+            }
         } catch {
             // Propagate error to UI via AppState
             appState.importError = error.localizedDescription
