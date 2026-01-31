@@ -1,0 +1,30 @@
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - force_cast
+  - force_try
+  - identifier_name
+  - type_name
+  - function_body_length
+  - function_parameter_count
+  - file_length
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - fatal_error_message
+
+excluded:
+  - Carthage
+  - Pods
+  - SwiftLint
+  - Build
+  - DerivedData
+  - OpenrouterTests
+  - OpenrouterUITests
+
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+
+reporter: "xcode"

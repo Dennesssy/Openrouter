@@ -1,10 +1,3 @@
-//
-//  ChatView.swift
-//  Openrouter
-//
-//  Created by Dennis Stewart Jr. on 1/26/26.
-//
-
 import SwiftUI
 import SwiftData
 #if os(iOS)
@@ -77,7 +70,7 @@ struct ChatView: View {
                     }
                     .padding()
                 }
-                .onChange(of: sortedMessages.count) { _ in
+                .onChange(of: sortedMessages.count) {
                     if let lastMessage = sortedMessages.last {
                         withAnimation {
                             scrollView.scrollTo(lastMessage.id, anchor: .bottom)
@@ -120,7 +113,7 @@ struct ChatView: View {
                         .background(Color.gray.opacity(0.2))
 #endif
                         .cornerRadius(12)
-                        .onChange(of: messageText) { _ in
+                        .onChange(of: messageText) { _, _ in
                             updateCostEstimation()
                         }
                 }
@@ -214,7 +207,8 @@ struct ChatView: View {
         let userMessage = ChatMessage.userMessage(messageText)
         session.addMessage(userMessage)
 
-        let messageToSend = messageText
+        // Store message content before clearing
+        let currentMessage = messageText
         messageText = ""
         isLoading = true
 
@@ -293,6 +287,9 @@ struct ChatView: View {
                     print("Error sending message: \(error)")
                     isLoading = false
 
+                    // Restore message text so user can retry
+                    messageText = currentMessage
+
                     // Add error message to chat
                     let errorMessage = ChatMessage.assistantMessage(
                         "Sorry, I encountered an error: \(error.localizedDescription)",
@@ -316,7 +313,7 @@ struct ChatView: View {
         do {
             let dailyLog = try modelContext.fetch(descriptor).first ?? DailyCostLog(date: today)
 
-            dailyLog.addCost(message.cost, forModel: modelId)
+            dailyLog.addCost(message.cost, tokens: message.tokenCount, forModel: modelId)
 
             if dailyLog.messageCount == 1 {
                 // New log, insert it

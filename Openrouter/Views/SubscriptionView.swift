@@ -15,8 +15,6 @@ struct SubscriptionView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
-    @State private var monthlyProduct: Product?
-    @State private var yearlyProduct: Product?
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -42,67 +40,20 @@ struct SubscriptionView: View {
                     }
                     .padding(.top, 32)
 
-                    if subscriptionManager.isSubscribed {
-                        // Current Subscription Status
-                        VStack(spacing: 16) {
-                            Text("✅ Premium Active")
-                                .font(.headline)
-                                .foregroundColor(.green)
-
-                            Text("You have access to all premium features")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding()
-#if os(iOS)
-                        .background(Color(.systemGray6))
-#else
-                        .background(Color.gray.opacity(0.2))
-#endif
-                        .cornerRadius(12)
+                    // Subscription Status
+                    subscriptionStatusView
                         .padding(.horizontal)
-                    } else {
-                        // Subscription Options
-                        VStack(spacing: 16) {
-                            if let monthly = monthlyProduct {
-                                SubscriptionOptionCard(
-                                    product: monthly,
-                                    isPopular: false,
-                                    action: { await purchase(product: monthly) }
-                                )
-                            }
-
-                            if let yearly = yearlyProduct {
-                                SubscriptionOptionCard(
-                                    product: yearly,
-                                    isPopular: true,
-                                    action: { await purchase(product: yearly) }
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
 
                     // Features List
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Premium Features")
-                            .font(.headline)
-                            .padding(.horizontal)
-
-                        FeatureRow(icon: "chart.bar.fill", title: "Advanced Analytics", description: "Detailed spending trends and model performance")
-                        FeatureRow(icon: "square.and.arrow.up", title: "Export Conversations", description: "Save chats as PDF or Markdown files")
-                        FeatureRow(icon: "star.fill", title: "Custom Model Ordering", description: "Reorder and favorite your preferred models")
-                        FeatureRow(icon: "target", title: "Model A/B Testing", description: "Compare responses side-by-side")
-                        FeatureRow(icon: "bell.fill", title: "Budget Alerts", description: "Get notified when approaching spending limits")
-                        FeatureRow(icon: "cloud.fill", title: "Cloud Sync", description: "Sync preferences across devices (coming soon)")
-                        FeatureRow(icon: "person.fill", title: "Priority Support", description: "Direct access to our support team")
-                    }
-                    .padding(.horizontal)
+                    featuresList
 
                     // Restore Purchases
                     if !subscriptionManager.isSubscribed {
-                        Button(action: restorePurchases) {
+                        Button(action: {
+                            Task {
+                                await restorePurchases()
+                            }
+                        }) {
                             Text("Restore Purchases")
                                 .font(.subheadline)
                                 .foregroundColor(.blue)
@@ -115,17 +66,18 @@ struct SubscriptionView: View {
                 .padding(.bottom, 32)
             }
 #if os(iOS)
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button("Done") {
-                dismiss()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
-        }
-    }
 #endif
             .task {
-                await loadProducts()
+                // Refresh subscription status when view appears
+                await subscriptionManager.checkSubscriptionStatus()
             }
             .alert("Purchase Error", isPresented: $showError) {
                 Button("OK") {}
@@ -133,7 +85,7 @@ struct SubscriptionView: View {
                 Text(errorMessage)
             }
             .overlay {
-                if isLoading {
+                if subscriptionManager.isLoading {
                     ProgressView()
                         .scaleEffect(1.5)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -143,46 +95,144 @@ struct SubscriptionView: View {
         }
     }
 
+    // MARK: - Status View
 
-    private func loadProducts() async {
-        do {
-            monthlyProduct = try await subscriptionManager.getMonthlyProduct()
-            yearlyProduct = try await subscriptionManager.getYearlyProduct()
-        } catch {
-            print("Error loading products: \(error)")
+    @ViewBuilder
+    private var subscriptionStatusView: some View {
+        if subscriptionManager.isSubscribed {
+            VStack(spacing: 16) {
+                statusBadgeView
+                
+                Text(subscriptionStatusDescription)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding()
+#if os(iOS)
+            .background(Color(.systemGray6))
+#else
+            .background(Color.gray.opacity(0.2))
+#endif
+            .cornerRadius(12)
+        } else {
+            // Subscription Options
+            VStack(spacing: 16) {
+                if let monthly = subscriptionManager.monthlyProduct {
+                    SubscriptionOptionCard(
+                        product: monthly,
+                        isPopular: false
+                    ) {
+                        await purchase(product: monthly)
+                    }
+                }
+
+                if let yearly = subscriptionManager.yearlyProduct {
+                    SubscriptionOptionCard(
+                        product: yearly,
+                        isPopular: true
+                    ) {
+                        await purchase(product: yearly)
+                    }
+                }
+            }
         }
     }
 
-    private func purchase(product: Product) async {
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            switch product.id {
-            case subscriptionManager.monthlyProductId:
-                try await subscriptionManager.purchaseMonthly()
-            case subscriptionManager.yearlyProductId:
-                try await subscriptionManager.purchaseYearly()
-            default:
-                throw SubscriptionError.productNotFound
+    @ViewBuilder
+    private var statusBadgeView: some View {
+        let status = subscriptionManager.subscriptionStatus
+        
+        switch status {
+        case .subscribed:
+            subscriptionBadge(text: "✅ Premium Active", color: .green)
+            
+        case .inGracePeriod:
+            subscriptionBadge(text: "⚠️ Grace Period", color: .orange)
+            
+        case .inBillingRetryPeriod:
+            subscriptionBadge(text: "⏳ Billing Issue", color: .orange)
+            
+        case .expired(let date):
+            VStack(spacing: 8) {
+                subscriptionBadge(text: "❌ Expired", color: .red)
+                Text("Expired on \(date.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+            
+        case .revoked:
+            subscriptionBadge(text: "🚫 Revoked", color: .red)
+            
+        case .notSubscribed, .unknown:
+            subscriptionBadge(text: "❓ Unknown", color: .gray)
+        }
+    }
+
+    private func subscriptionBadge(text: String, color: Color) -> some View {
+        Text(text)
+            .font(.headline)
+            .foregroundColor(color)
+    }
+
+    private var subscriptionStatusDescription: String {
+        switch subscriptionManager.subscriptionStatus {
+        case .subscribed(let date):
+            if let date = date {
+                return "Your subscription renews on \(date.formatted(date: .abbreviated, time: .omitted))"
+            }
+            return "Premium features are active"
+            
+        case .inGracePeriod:
+            return "Your payment failed but you still have access. Please update your payment method to avoid interruption."
+            
+        case .inBillingRetryPeriod:
+            return "We're retrying your payment. Please update your payment method in Settings."
+            
+        case .expired, .revoked:
+            return "Your subscription has ended. Subscribe again to regain access to premium features."
+            
+        case .notSubscribed, .unknown:
+            return ""
+        }
+    }
+
+    // MARK: - Features List
+
+    private var featuresList: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Premium Features")
+                .font(.headline)
+                .padding(.horizontal)
+
+            FeatureRow(icon: "chart.bar.fill", title: "Advanced Analytics", description: "Detailed spending trends and model performance")
+            FeatureRow(icon: "square.and.arrow.up", title: "Export Conversations", description: "Save chats as PDF or Markdown files")
+            FeatureRow(icon: "star.fill", title: "Custom Model Ordering", description: "Reorder and favorite your preferred models")
+            FeatureRow(icon: "target", title: "Model A/B Testing", description: "Compare responses side-by-side")
+            FeatureRow(icon: "bell.fill", title: "Budget Alerts", description: "Get notified when approaching spending limits")
+            FeatureRow(icon: "cloud.fill", title: "Cloud Sync", description: "Sync preferences across devices (coming soon)")
+            FeatureRow(icon: "person.fill", title: "Priority Support", description: "Direct access to our support team")
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Actions
+
+    private func purchase(product: Product) async {
+        do {
+            try await subscriptionManager.purchaseMonthly() // or purchaseYearly based on product.id
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
     }
 
-    private func restorePurchases() {
-        Task {
-            isLoading = true
-            defer { isLoading = false }
-
-            do {
-                try await subscriptionManager.restorePurchases()
-            } catch {
-                errorMessage = "Failed to restore purchases"
-                showError = true
-            }
+    private func restorePurchases() async {
+        do {
+            try await subscriptionManager.restorePurchases()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
         }
     }
 }
@@ -212,6 +262,15 @@ struct SubscriptionOptionCard: View {
                     .font(.title3)
                     .fontWeight(.semibold)
 
+                // Show introductory offer if available
+                if let subscription = product.subscription,
+                   let introductoryOffer = subscription.introductoryOffer {
+                    Text("Limited time: \(introductoryOffer.displayPrice)")
+                        .font(.subheadline)
+                        .foregroundColor(.green)
+                }
+
+                // Regular price
                 if let subscription = product.subscription {
                     Text({
                         let period = subscription.subscriptionPeriod
@@ -261,11 +320,7 @@ struct SubscriptionOptionCard: View {
 #if os(iOS)
             .background(Color(.systemBackground))
 #else
-#if os(iOS)
-            .background(Color(.systemBackground))
-#else
             .background(Color.gray.opacity(0.1))
-#endif
 #endif
             .cornerRadius(16)
             .shadow(radius: 4)

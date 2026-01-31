@@ -1,15 +1,22 @@
+//
+//  UsageTrackerView.swift
+//  Openrouter
+//
+//  Created by Dennis Stewart Jr. on 1/26/26.
+//
+
 import SwiftUI
 import SwiftData
+import Charts
 
 struct UsageTrackerView: View {
-    @Query(sort: \DailyCostLog.date, order: .reverse) private var dailyLogs: [DailyCostLog]
+    @Query(sort: \DailyCostLog.date, order: .forward) private var dailyLogs: [DailyCostLog]
     @Environment(\.modelContext) private var modelContext
 
     // Period selection
     @State private var selectedPeriod: Period = .week
 
     enum Period: String, CaseIterable {
-        case day = "Today"
         case week = "This Week"
         case month = "This Month"
         case all = "All Time"
@@ -18,7 +25,7 @@ struct UsageTrackerView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 24) {
                     // Period Picker
                     Picker("Period", selection: $selectedPeriod) {
                         ForEach(Period.allCases, id: \.self) { period in
@@ -32,7 +39,7 @@ struct UsageTrackerView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
                         SummaryCard(
                             title: "Total Cost",
-                            value: formatCurrency(filteredLogs.reduce(0) { $0 + $1.totalCost }),
+                            value: formatCurrency(filteredLogs.reduce(0) { $0 + $1.totalSpent }),
                             icon: "dollarsign.circle.fill",
                             color: .green
                         )
@@ -60,55 +67,86 @@ struct UsageTrackerView: View {
                     }
                     .padding(.horizontal)
 
-                    // Cost Trend Chart (simplified placeholder)
+                    // Cost Trend Chart
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Cost Trend")
                             .font(.headline)
                             .padding(.horizontal)
 
                         if filteredLogs.isEmpty {
-                            Text("No data available for selected period")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 40)
+                            EmptyStateView(message: "No data available")
                         } else {
-                            // Placeholder for chart - would implement with SwiftUI Charts
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.gray.opacity(0.1))
-                                .frame(height: 200)
-                                .overlay(
-                                    Text("Chart would show cost over time")
-                                        .foregroundStyle(.secondary)
+                            Chart(filteredLogs) { log in
+                                LineMark(
+                                    x: .value("Date", log.date, unit: .day),
+                                    y: .value("Cost", log.totalSpent)
                                 )
-                                .padding(.horizontal)
+                                .interpolationMethod(.catmullRom)
+                                .symbol(by: .value("Date", log.date))
+
+                                AreaMark(
+                                    x: .value("Date", log.date, unit: .day),
+                                    y: .value("Cost", log.totalSpent)
+                                )
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue.opacity(0.3), .blue.opacity(0.0)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                            }
+                            .chartYAxis {
+                                AxisMarks(format: .currency(code: "USD"))
+                            }
+                            .frame(height: 220)
+                            .padding(.horizontal)
                         }
                     }
 
                     // Model Usage Breakdown
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Model Usage")
+                        Text("Model Cost Distribution")
                             .font(.headline)
                             .padding(.horizontal)
 
                         if filteredLogs.isEmpty {
-                            Text("No usage data available")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 20)
+                            EmptyStateView(message: "No usage data available")
                         } else {
-                            // Calculate model usage
                             let modelUsage = calculateModelUsage()
+                            let sortedUsage = modelUsage.sorted { $0.value > $1.value }
 
-                            ForEach(modelUsage.sorted { $0.value > $1.value }, id: \.key) { modelId, usage in
-                                HStack {
-                                    Text(modelId)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text(formatCurrency(usage.cost))
-                                        .foregroundStyle(.secondary)
+                            // Donut Chart
+                            Chart(sortedUsage, id: \.key) { key, value in
+                                SectorMark(
+                                    angle: .value("Cost", value),
+                                    innerRadius: .ratio(0.618),
+                                    angularInset: 1.5
+                                )
+                                .cornerRadius(5)
+                                .foregroundStyle(by: .value("Model", key))
+                            }
+                            .frame(height: 220)
+                            .padding(.horizontal)
+
+                            // Legend List
+                            VStack(spacing: 8) {
+                                ForEach(sortedUsage, id: \.key) { modelId, cost in
+                                    HStack {
+                                        Circle()
+                                            .fill(Color.blue) // In a real app, match chart colors
+                                            .frame(width: 8, height: 8)
+                                        Text(modelId)
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Text(formatCurrency(cost))
+                                            .font(.subheadline)
+                                            .monospacedDigit()
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.horizontal)
                                 }
-                                .padding(.vertical, 4)
-                                .padding(.horizontal)
                             }
                         }
                     }
@@ -116,7 +154,7 @@ struct UsageTrackerView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Usage Analytics")
-            .navigationBarTitleDisplayMode(.inline)
+            // REMOVED: .navigationBarTitleDisplayMode(.inline) - not available on macOS
         }
     }
 
@@ -128,13 +166,11 @@ struct UsageTrackerView: View {
 
         return dailyLogs.filter { log in
             switch selectedPeriod {
-            case .day:
-                return calendar.isDate(log.date, inSameDayAs: now)
             case .week:
-                let weekStart = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
+                let weekStart = calendar.date(byAdding: .day, value: -7, to: now)!
                 return log.date >= weekStart
             case .month:
-                let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
+                let monthStart = calendar.date(byAdding: .month, value: -1, to: now)!
                 return log.date >= monthStart
             case .all:
                 return true
@@ -157,24 +193,20 @@ struct UsageTrackerView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
-    private func calculateModelUsage() -> [String: (cost: Double, tokens: Int)] {
-        var usage: [String: (cost: Double, tokens: Int)] = [:]
+    private func calculateModelUsage() -> [String: Double] {
+        var usage: [String: Double] = [:]
 
         for log in filteredLogs {
-            // This is a simplified calculation - in a real app you'd store model usage per log
-            // For now, we'll aggregate all usage under "Various Models"
-            let key = "Various Models"
-            usage[key] = (
-                cost: (usage[key]?.cost ?? 0) + log.totalCost,
-                tokens: (usage[key]?.tokens ?? 0) + log.totalTokens
-            )
+            for (modelId, cost) in log.modelBreakdown {
+                usage[modelId, default: 0] += cost
+            }
         }
 
         return usage
     }
 }
 
-// MARK: - Summary Card Component
+// MARK: - Supporting Views
 
 struct SummaryCard: View {
     let title: String
@@ -191,6 +223,7 @@ struct SummaryCard: View {
             Text(value)
                 .font(.title2)
                 .fontWeight(.bold)
+                .minimumScaleFactor(0.8)
 
             Text(title)
                 .font(.caption)
@@ -199,9 +232,22 @@ struct SummaryCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(nsColor: .controlBackgroundColor)) // FIXED: macOS color
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(radius: 2)
+    }
+}
+
+struct EmptyStateView: View {
+    let message: String
+    
+    var body: some View {
+        Text(message)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 40)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5)) // FIXED: macOS color
+            .cornerRadius(12)
+            .padding(.horizontal)
     }
 }
 

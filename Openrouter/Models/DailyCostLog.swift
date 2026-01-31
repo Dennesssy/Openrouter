@@ -13,12 +13,16 @@ final class DailyCostLog {
     @Attribute(.unique) var date: Date  // Start of day
     var totalSpent: Double = 0
     var messageCount: Int = 0
+    var totalTokens: Int = 0
+    var sessionCount: Int = 0
     var modelBreakdown: [String: Double] = [:]  // "gpt-4o": 1.23
 
-    init(date: Date, totalSpent: Double = 0, messageCount: Int = 0, modelBreakdown: [String: Double] = [:]) {
+    init(date: Date, totalSpent: Double = 0, messageCount: Int = 0, totalTokens: Int = 0, sessionCount: Int = 0, modelBreakdown: [String: Double] = [:]) {
         self.date = Calendar.current.startOfDay(for: date)
         self.totalSpent = totalSpent
         self.messageCount = messageCount
+        self.totalTokens = totalTokens
+        self.sessionCount = sessionCount
         self.modelBreakdown = modelBreakdown
     }
 
@@ -33,9 +37,10 @@ final class DailyCostLog {
     }
 
     // Methods
-    func addCost(_ cost: Double, forModel modelId: String) {
+    func addCost(_ cost: Double, tokens: Int, forModel modelId: String) {
         totalSpent += cost
         messageCount += 1
+        totalTokens += tokens
         modelBreakdown[modelId, default: 0] += cost
     }
 

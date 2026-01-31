@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 90;
 	objects = {
 
 /* Begin PBXContainerItemProxy section */
@@ -50,24 +50,18 @@
 /* Begin PBXFrameworksBuildPhase section */
 		31A542E72F28689A00C3153C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		31A542F62F28689C00C3153C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		31A543002F28689C00C3153C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -105,14 +99,10 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				31A542EC2F28689A00C3153C /* Openrouter */,
 			);
 			name = Openrouter;
-			packageProductDependencies = (
-			);
 			productName = Openrouter;
 			productReference = 31A542EA2F28689A00C3153C /* Openrouter.app */;
 			productType = "com.apple.product-type.application";
@@ -134,8 +124,6 @@
 				31A542FC2F28689C00C3153C /* OpenrouterTests */,
 			);
 			name = OpenrouterTests;
-			packageProductDependencies = (
-			);
 			productName = OpenrouterTests;
 			productReference = 31A542F92F28689C00C3153C /* OpenrouterTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -157,8 +145,6 @@
 				31A543062F28689C00C3153C /* OpenrouterUITests */,
 			);
 			name = OpenrouterUITests;
-			packageProductDependencies = (
-			);
 			productName = OpenrouterUITests;
 			productReference = 31A543032F28689C00C3153C /* OpenrouterUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -195,7 +181,7 @@
 			);
 			mainGroup = 31A542E12F28689A00C3153C;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
+			preferredProjectObjectVersion = 90;
 			productRefGroup = 31A542EB2F28689A00C3153C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -210,48 +196,36 @@
 /* Begin PBXResourcesBuildPhase section */
 		31A542E82F28689A00C3153C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		31A542F72F28689C00C3153C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		31A543012F28689C00C3153C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		31A542E62F28689A00C3153C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		31A542F52F28689C00C3153C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		31A542FF2F28689C00C3153C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -269,7 +243,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		31A5430B2F28689C00C3153C /* Debug */ = {
+		31A5430B2F28689C00C3153C /* Debug configuration for PBXProject "Openrouter" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -331,7 +305,7 @@
 			};
 			name = Debug;
 		};
-		31A5430C2F28689C00C3153C /* Release */ = {
+		31A5430C2F28689C00C3153C /* Release configuration for PBXProject "Openrouter" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -385,7 +359,7 @@
 			};
 			name = Release;
 		};
-		31A5430E2F28689C00C3153C /* Debug */ = {
+		31A5430E2F28689C00C3153C /* Debug configuration for PBXNativeTarget "Openrouter" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -408,10 +382,10 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = denn.Openrouter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -425,11 +399,11 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.2;
+				XROS_DEPLOYMENT_TARGET = 2.6;
 			};
 			name = Debug;
 		};
-		31A5430F2F28689C00C3153C /* Release */ = {
+		31A5430F2F28689C00C3153C /* Release configuration for PBXNativeTarget "Openrouter" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -452,10 +426,10 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = denn.Openrouter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -469,11 +443,11 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.2;
+				XROS_DEPLOYMENT_TARGET = 2.6;
 			};
 			name = Release;
 		};
-		31A543112F28689C00C3153C /* Debug */ = {
+		31A543112F28689C00C3153C /* Debug configuration for PBXNativeTarget "OpenrouterTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -499,7 +473,7 @@
 			};
 			name = Debug;
 		};
-		31A543122F28689C00C3153C /* Release */ = {
+		31A543122F28689C00C3153C /* Release configuration for PBXNativeTarget "OpenrouterTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -525,7 +499,7 @@
 			};
 			name = Release;
 		};
-		31A543142F28689C00C3153C /* Debug */ = {
+		31A543142F28689C00C3153C /* Debug configuration for PBXNativeTarget "OpenrouterUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -550,7 +524,7 @@
 			};
 			name = Debug;
 		};
-		31A543152F28689C00C3153C /* Release */ = {
+		31A543152F28689C00C3153C /* Release configuration for PBXNativeTarget "OpenrouterUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -581,37 +555,33 @@
 		31A542E52F28689A00C3153C /* Build configuration list for PBXProject "Openrouter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				31A5430B2F28689C00C3153C /* Debug */,
-				31A5430C2F28689C00C3153C /* Release */,
+				31A5430B2F28689C00C3153C /* Debug configuration for PBXProject "Openrouter" */,
+				31A5430C2F28689C00C3153C /* Release configuration for PBXProject "Openrouter" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		31A5430D2F28689C00C3153C /* Build configuration list for PBXNativeTarget "Openrouter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				31A5430E2F28689C00C3153C /* Debug */,
-				31A5430F2F28689C00C3153C /* Release */,
+				31A5430E2F28689C00C3153C /* Debug configuration for PBXNativeTarget "Openrouter" */,
+				31A5430F2F28689C00C3153C /* Release configuration for PBXNativeTarget "Openrouter" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		31A543102F28689C00C3153C /* Build configuration list for PBXNativeTarget "OpenrouterTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				31A543112F28689C00C3153C /* Debug */,
-				31A543122F28689C00C3153C /* Release */,
+				31A543112F28689C00C3153C /* Debug configuration for PBXNativeTarget "OpenrouterTests" */,
+				31A543122F28689C00C3153C /* Release configuration for PBXNativeTarget "OpenrouterTests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		31A543132F28689C00C3153C /* Build configuration list for PBXNativeTarget "OpenrouterUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				31A543142F28689C00C3153C /* Debug */,
-				31A543152F28689C00C3153C /* Release */,
+				31A543142F28689C00C3153C /* Debug configuration for PBXNativeTarget "OpenrouterUITests" */,
+				31A543152F28689C00C3153C /* Release configuration for PBXNativeTarget "OpenrouterUITests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */

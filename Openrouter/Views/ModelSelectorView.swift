@@ -118,25 +118,9 @@ struct ModelSelectorView: View {
                 }
                 .padding(.vertical)
 #if os(iOS)
-#if os(iOS)
-    #if os(iOS)
-            .background(Color(.systemBackground))
-#else
-            .background(Color.gray.opacity(0.1))
-#endif
+                .background(Color(.systemGray6))
 #else
                 .background(Color.gray.opacity(0.1))
-#endif
-#else
-#if os(iOS)
-    #if os(iOS)
-            .background(Color(.systemBackground))
-#else
-            .background(Color.gray.opacity(0.1))
-#endif
-#else
-                .background(Color.gray.opacity(0.1))
-#endif
 #endif
 
                 // Favorites Section (if any)

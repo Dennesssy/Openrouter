@@ -101,7 +101,9 @@ class OpenRouterClient {
             return .apiError(
                 code: errorResponse.error.code,
                 message: errorResponse.error.message,
-                metadata: errorResponse.error.metadata
+                metadata: errorResponse.error.metadata?.reduce(into: [String: Any]()) { dict, pair in
+                    dict[pair.key] = pair.value
+                }
             )
         } catch {
             // Fallback to HTTP status code based errors
@@ -221,16 +223,40 @@ class OpenRouterClient {
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        configureRequest(&request)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let jsonData = try JSONEncoder().encode(requestBody)
         request.httpBody = jsonData
 
-        let (data, _) = try await networkManager.performRequest(request)
+        do {
+            let (data, response) = try await networkManager.performRequest(request)
 
-        let decoder = JSONDecoder()
-        return try decoder.decode(ChatResponse.self, from: data)
+            // Check for API-level errors even on 200 OK responses
+            // (Some APIs return error details in the body even with 200 status)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+                throw parseAPIError(data: data, response: response)
+            }
+
+            let decoder = JSONDecoder()
+            return try decoder.decode(ChatResponse.self, from: data)
+        } catch let error as NetworkError {
+            // Convert NetworkError to OpenRouterError when possible
+            switch error {
+            case .unauthorized:
+                throw OpenRouterError.authenticationError
+            case .rateLimited:
+                throw OpenRouterError.rateLimitError(retryAfter: nil)
+            case .noInternetConnection, .timeout, .serverError, .httpError:
+                throw OpenRouterError.networkError(error)
+            case .invalidResponse, .decodingError, .unknown, .forbidden, .notFound:
+                throw OpenRouterError.networkError(error)
+            }
+        } catch let error as OpenRouterError {
+            throw error
+        } catch {
+            throw OpenRouterError.networkError(error)
+        }
     }
 
     // MARK: - Models
@@ -293,6 +319,11 @@ class OpenRouterClient {
         do {
             let (data, response) = try await networkManager.performRequest(request)
 
+            // Check for error responses
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+                throw parseAPIError(data: data, response: response)
+            }
+
             let decoder = JSONDecoder()
             let apiResponse = try decoder.decode(ModelsResponse.self, from: data)
             return apiResponse.data
@@ -300,11 +331,9 @@ class OpenRouterClient {
             throw OpenRouterError.networkError(error)
         } catch let error as DecodingError {
             throw OpenRouterError.decodingError(error)
+        } catch let error as OpenRouterError {
+            throw error
         } catch {
-            // If it's already an OpenRouterError, rethrow it
-            if let openRouterError = error as? OpenRouterError {
-                throw openRouterError
-            }
             // Otherwise, wrap in network error
             throw OpenRouterError.networkError(error)
         }

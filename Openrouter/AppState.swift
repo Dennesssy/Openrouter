@@ -21,7 +21,10 @@ class AppState: ObservableObject {
     let appTitle: String = "OpenRouter SwiftUI App"
 
     private var modelContainer: ModelContainer?
-    private let notificationService = NotificationService.shared
+    private var notificationService = NotificationService.shared
+
+    // Keep reference to background task for cancellation
+    private var backgroundRefreshTask: Task<Void, Never>?
 
     init() {
         // Request notification authorization when app launches
@@ -38,14 +41,19 @@ class AppState: ObservableObject {
         startBackgroundModelRefresh()
     }
 
+    func stopBackgroundRefresh() {
+        backgroundRefreshTask?.cancel()
+        backgroundRefreshTask = nil
+    }
+
     // MARK: - Background Model Refresh
 
     private func startBackgroundModelRefresh() {
-        Task {
+        backgroundRefreshTask = Task {
             // Initial delay to avoid immediate refresh on app launch
             try? await Task.sleep(nanoseconds: 30 * 1_000_000_000) // 30 seconds
 
-            while true {
+            while !Task.isCancelled {
                 await performBackgroundModelRefresh()
 
                 // Wait 24 hours before next refresh
