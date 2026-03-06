@@ -15,15 +15,19 @@ final class DailyCostLog {
     var messageCount: Int = 0
     var totalTokens: Int = 0
     var sessionCount: Int = 0
-    var modelBreakdown: [String: Double] = [:]  // "gpt-4o": 1.23
+    var modelBreakdown: [String: Double] = [:]  // Model ID -> Cost
+    var modelTokens: [String: Int] = [:]  // Model ID -> Total tokens
+    var modelMessages: [String: Int] = [:]  // Model ID -> Message count
 
-    init(date: Date, totalSpent: Double = 0, messageCount: Int = 0, totalTokens: Int = 0, sessionCount: Int = 0, modelBreakdown: [String: Double] = [:]) {
+    init(date: Date, totalSpent: Double = 0, messageCount: Int = 0, totalTokens: Int = 0, sessionCount: Int = 0, modelBreakdown: [String: Double] = [:], modelTokens: [String: Int] = [:], modelMessages: [String: Int] = [:]) {
         self.date = Calendar.current.startOfDay(for: date)
         self.totalSpent = totalSpent
         self.messageCount = messageCount
         self.totalTokens = totalTokens
         self.sessionCount = sessionCount
         self.modelBreakdown = modelBreakdown
+        self.modelTokens = modelTokens
+        self.modelMessages = modelMessages
     }
 
     // Computed properties
@@ -41,7 +45,20 @@ final class DailyCostLog {
         totalSpent += cost
         messageCount += 1
         totalTokens += tokens
+        
+        // Track per-model stats
         modelBreakdown[modelId, default: 0] += cost
+        modelTokens[modelId, default: 0] += tokens
+        modelMessages[modelId, default: 0] += 1
+    }
+    
+    // Get stats for a specific model
+    func statsForModel(_ modelId: String) -> (cost: Double, tokens: Int, messages: Int) {
+        return (
+            cost: modelBreakdown[modelId] ?? 0,
+            tokens: modelTokens[modelId] ?? 0,
+            messages: modelMessages[modelId] ?? 0
+        )
     }
 
     // Static helpers

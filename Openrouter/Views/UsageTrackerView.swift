@@ -106,20 +106,20 @@ struct UsageTrackerView: View {
 
                     // Model Usage Breakdown
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Model Cost Distribution")
+                        Text("Model Usage Breakdown")
                             .font(.headline)
                             .padding(.horizontal)
 
                         if filteredLogs.isEmpty {
                             EmptyStateView(message: "No usage data available")
                         } else {
-                            let modelUsage = calculateModelUsage()
-                            let sortedUsage = modelUsage.sorted { $0.value > $1.value }
+                            let modelStats = calculateDetailedModelStats()
+                            let sortedStats = modelStats.sorted { $0.value.cost > $1.value.cost }
 
                             // Donut Chart
-                            Chart(sortedUsage, id: \.key) { key, value in
+                            Chart(sortedStats, id: \.key) { key, value in
                                 SectorMark(
-                                    angle: .value("Cost", value),
+                                    angle: .value("Cost", value.cost),
                                     innerRadius: .ratio(0.618),
                                     angularInset: 1.5
                                 )
@@ -129,25 +129,18 @@ struct UsageTrackerView: View {
                             .frame(height: 220)
                             .padding(.horizontal)
 
-                            // Legend List
-                            VStack(spacing: 8) {
-                                ForEach(sortedUsage, id: \.key) { modelId, cost in
-                                    HStack {
-                                        Circle()
-                                            .fill(Color.blue) // In a real app, match chart colors
-                                            .frame(width: 8, height: 8)
-                                        Text(modelId)
-                                            .font(.subheadline)
-                                            .lineLimit(1)
-                                        Spacer()
-                                        Text(formatCurrency(cost))
-                                            .font(.subheadline)
-                                            .monospacedDigit()
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.horizontal)
+                            // Detailed Stats List
+                            VStack(spacing: 12) {
+                                ForEach(sortedStats, id: \.key) { modelId, stats in
+                                    ModelUsageRow(
+                                        modelId: modelId,
+                                        cost: stats.cost,
+                                        tokens: stats.tokens,
+                                        messages: stats.messages
+                                    )
                                 }
                             }
+                            .padding(.horizontal)
                         }
                     }
                 }
@@ -204,6 +197,29 @@ struct UsageTrackerView: View {
 
         return usage
     }
+    
+    struct ModelUsageStats {
+        var cost: Double
+        var tokens: Int
+        var messages: Int
+    }
+    
+    private func calculateDetailedModelStats() -> [String: ModelUsageStats] {
+        var stats: [String: ModelUsageStats] = [:]
+
+        for log in filteredLogs {
+            for (modelId, cost) in log.modelBreakdown {
+                let existingStats = stats[modelId] ?? ModelUsageStats(cost: 0, tokens: 0, messages: 0)
+                stats[modelId] = ModelUsageStats(
+                    cost: existingStats.cost + cost,
+                    tokens: existingStats.tokens + (log.modelTokens[modelId] ?? 0),
+                    messages: existingStats.messages + (log.modelMessages[modelId] ?? 0)
+                )
+            }
+        }
+
+        return stats
+    }
 }
 
 // MARK: - Supporting Views
@@ -232,7 +248,11 @@ struct SummaryCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(nsColor: .controlBackgroundColor)) // FIXED: macOS color
+#if os(iOS)
+        .background(Color(.systemGray6))
+#else
+        .background(Color(nsColor: .controlBackgroundColor))
+#endif
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -245,9 +265,95 @@ struct EmptyStateView: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 40)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5)) // FIXED: macOS color
+#if os(iOS)
+            .background(Color(.systemGray6).opacity(0.5))
+#else
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+#endif
             .cornerRadius(12)
             .padding(.horizontal)
+    }
+}
+
+struct ModelUsageRow: View {
+    let modelId: String
+    let cost: Double
+    let tokens: Int
+    let messages: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "cpu.fill")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+                
+                Text(modelId)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                Text(formatCurrency(cost))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+            }
+            
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Image(systemName: "number.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("\(formatNumber(tokens)) tokens")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("\(messages) msg")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Text(averageCostPerMessage)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding()
+#if os(iOS)
+        .background(Color(.systemGray6))
+#else
+        .background(Color(nsColor: .controlBackgroundColor))
+#endif
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    private var averageCostPerMessage: String {
+        guard messages > 0 else { return "$0.00/msg" }
+        let avg = cost / Double(messages)
+        return String(format: "$%.4f/msg", avg)
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(value)"
+    }
+    
+    private func formatNumber(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }
 
