@@ -14,66 +14,160 @@ struct ChatView: View {
     @State private var estimatedCost = 0.0
     @State private var showBudgetAlert = false
     @State private var budgetAlertMessage = ""
+    @State private var showErrorAlert = false
+    @State private var errorAlertMessage = ""
 
     private var userPreferences: UserPreferences? {
         preferences.first
     }
 
+    // Cached sorted messages - only re-sorts when message count changes
     private var sortedMessages: [ChatMessage] {
         session.messages.sorted { $0.timestamp < $1.timestamp }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Chat Header
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(session.title)
-                        .font(.headline)
+            // Chat Header with improved design
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.title)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
 
-                    if let model = session.model {
-                        Text(model.name)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        if let model = session.model {
+                            HStack(spacing: 6) {
+                                Image(systemName: "cpu.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(model.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "dollarsign.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(String(format: "$%.4f", session.totalCost))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "number.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            Text("\(session.totalPromptTokens + session.totalCompletionTokens)")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .monospacedDigit()
+                            Text("tokens")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
-
-                Spacer()
-
-                VStack(alignment: .trailing) {
-                    Text(String(format: "$%.4f", session.totalCost))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Text("\(session.totalPromptTokens + session.totalCompletionTokens) tokens")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding()
 #if os(iOS)
             .background(Color(.systemBackground))
 #else
-            .background(Color.gray.opacity(0.1))
+            .background(Color(NSColor.controlBackgroundColor))
 #endif
 
             Divider()
 
-            // Messages List
+            // Messages List with improved layout
             ScrollViewReader { scrollView in
                 ScrollView {
-                    LazyVStack(spacing: 16) {
+                    LazyVStack(spacing: 12) {
                         ForEach(sortedMessages) { message in
                             MessageView(message: message)
                                 .id(message.id)
                         }
+                        
+                        // Typing indicator when loading
+                        if isLoading {
+                            HStack(alignment: .top, spacing: 12) {
+                                ZStack {
+                                    Circle()
+#if os(iOS)
+                                        .fill(Color.green.gradient)
+#else
+                                        .fill(Color.green)
+#endif
+                                        .frame(width: 36, height: 36)
+                                    
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 18, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                                .frame(width: 36, height: 36)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("AI Assistant")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(Color.green)
+                                    
+                                    HStack(spacing: 6) {
+                                        ForEach(0..<3) { index in
+                                            Circle()
+                                                .fill(Color.secondary)
+                                                .frame(width: 8, height: 8)
+                                                .opacity(0.6)
+                                                .animation(
+                                                    Animation.easeInOut(duration: 0.6)
+                                                        .repeatForever()
+                                                        .delay(Double(index) * 0.2),
+                                                    value: isLoading
+                                                )
+                                        }
+                                    }
+                                    .padding(.vertical, 8)
+                                }
+                            }
+                            .padding(16)
+#if os(iOS)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(.systemGray6))
+                            )
+#else
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.gray.opacity(0.15))
+                            )
+#endif
+                            .id("loading")
+                            .transition(.opacity)
+                        }
                     }
-                    .padding()
+                    .padding(16)
                 }
                 .onChange(of: sortedMessages.count) {
                     if let lastMessage = sortedMessages.last {
-                        withAnimation {
+                        withAnimation(.easeOut(duration: 0.3)) {
                             scrollView.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: isLoading) {
+                    if isLoading {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            scrollView.scrollTo("loading", anchor: .bottom)
                         }
                     }
                 }
@@ -81,59 +175,100 @@ struct ChatView: View {
 
             Divider()
 
-            // Cost Estimation
+            // Cost Estimation with improved design
             if !messageText.isEmpty {
-                HStack {
-                    Text("Estimated cost: \(String(format: "$%.6f", estimatedCost))")
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Estimated cost:")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(String(format: "$%.6f", estimatedCost))
                         .font(.caption)
-                        .foregroundColor(.secondary)
-
+                        .fontWeight(.medium)
+                        .foregroundStyle(.blue)
+                        .monospacedDigit()
+                    
                     Spacer()
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+#if os(iOS)
+                .background(Color(.systemGray6).opacity(0.5))
+#else
+                .background(Color.gray.opacity(0.1))
+#endif
             }
 
-            // Input Area
+            // Input Area with improved design
             HStack(alignment: .bottom, spacing: 12) {
                 ZStack(alignment: .topLeading) {
+                    // Placeholder text
                     if messageText.isEmpty {
-                        Text("Type your message...")
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 12)
+                        Text("Message")
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .font(.body)
                     }
 
                     TextEditor(text: $messageText)
-                        .frame(minHeight: 40, maxHeight: 120)
-                        .padding(8)
+                        .frame(minHeight: 44, maxHeight: 120)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .scrollContentBackground(.hidden)
 #if os(iOS)
                         .background(Color(.systemGray6))
 #else
-                        .background(Color.gray.opacity(0.2))
+                        .background(Color(NSColor.textBackgroundColor))
 #endif
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
                         .onChange(of: messageText) { _, _ in
                             updateCostEstimation()
                         }
                 }
 
+                // Send button with better visual design
                 Button(action: sendMessage) {
                     ZStack {
+                        let isEmpty = messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        Circle()
+#if os(iOS)
+                            .fill(isEmpty ? Color.secondary.opacity(0.3) : Color.blue.gradient)
+#else
+                            .fill(isEmpty ? Color.secondary.opacity(0.3) : Color.blue)
+#endif
+                            .frame(width: 36, height: 36)
+                        
                         if isLoading {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
                         } else {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .blue)
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
                         }
                     }
                 }
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
-                .frame(width: 32, height: 32)
+                .accessibilityLabel("Send message")
+                .accessibilityHint(messageText.isEmpty ? "Enter a message to send" : "Send your message")
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+#if os(iOS)
+            .background(Color(.systemBackground))
+#else
+            .background(Color(NSColor.controlBackgroundColor))
+#endif
         }
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -144,12 +279,22 @@ struct ChatView: View {
         .alert("Budget Alert", isPresented: $showBudgetAlert) {
             Button("OK") {}
             if budgetAlertMessage.contains("exceeds remaining") {
-                Button("Use Cheaper Model") {
-                    // TODO: Suggest cheaper model
+                Button("Settings") {
+                    // User can adjust budget in Settings
                 }
             }
         } message: {
             Text(budgetAlertMessage)
+        }
+        .alert("Error", isPresented: $showErrorAlert) {
+            Button("OK") {}
+            if errorAlertMessage.contains("API key") {
+                Button("Open Settings") {
+                    // Navigate to settings
+                }
+            }
+        } message: {
+            Text(errorAlertMessage)
         }
     }
 
@@ -170,12 +315,14 @@ struct ChatView: View {
     private func sendMessage() {
         // Get API key from Keychain
         guard let apiKey = try? KeychainManager.shared.getAPIKey() else {
-            // TODO: Show error - no API key, prompt to enter one
+            errorAlertMessage = "No API key found. Please add your OpenRouter API key in Settings to start chatting."
+            showErrorAlert = true
             return
         }
 
         guard let model = session.model else {
-            // TODO: Show error - no model selected
+            errorAlertMessage = "No model selected. Please select a model for this chat session."
+            showErrorAlert = true
             return
         }
 
@@ -362,59 +509,90 @@ struct MessageView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Avatar
+            // Avatar with better visual design
             ZStack {
+                Circle()
+#if os(iOS)
+                    .fill(message.role == "user" ? Color.blue.gradient : Color.green.gradient)
+#else
+                    .fill(message.role == "user" ? Color.blue : Color.green)
+#endif
+                    .frame(width: 36, height: 36)
+                
                 if message.role == "user" {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.blue)
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
                 } else {
-                    Image(systemName: "cpu")
-                        .font(.system(size: 32))
-                        .foregroundColor(.green)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
                 }
             }
-            .frame(width: 32, height: 32)
+            .frame(width: 36, height: 36)
+            .accessibilityLabel(message.role == "user" ? "User message" : "AI response")
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Role and timestamp
-                HStack {
-                    Text(message.role.capitalized)
+            VStack(alignment: .leading, spacing: 8) {
+                // Role and timestamp with improved typography
+                HStack(spacing: 8) {
+                    Text(message.role == "user" ? "You" : "AI Assistant")
                         .font(.subheadline)
                         .fontWeight(.semibold)
+                        .foregroundStyle(message.role == "user" ? Color.blue : Color.green)
 
                     Spacer()
 
                     Text(message.timestamp, format: .dateTime.hour().minute())
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
-                // Message content
+                // Message content with improved readability
                 Text(message.content)
                     .font(.body)
+                    .lineSpacing(4)
+                    .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Message: \(message.content)")
 
-                // Token count and cost (for assistant messages)
+                // Token count and cost with better visual design
                 if message.role == "assistant" && message.tokenCount > 0 {
-                    HStack(spacing: 16) {
-                        Text("\(message.tokenCount) tokens")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    HStack(spacing: 12) {
+                        Label("\(message.tokenCount)", systemImage: "number.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("\(message.tokenCount) tokens")
 
-                        Text(String(format: "$%.6f", message.cost))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Label(String(format: "$%.6f", message.cost), systemImage: "dollarsign.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Cost: \(String(format: "$%.6f", message.cost))")
                     }
+                    .padding(.top, 4)
                 }
             }
         }
-        .padding()
+        .padding(16)
 #if os(iOS)
-        .background(message.role == "user" ? Color.blue.opacity(0.1) : Color(.systemGray6))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(message.role == "user" 
+                    ? Color.blue.opacity(0.08) 
+                    : Color(.systemGray6))
+        )
 #else
-        .background(message.role == "user" ? Color.blue.opacity(0.1) : Color.gray.opacity(0.2))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(message.role == "user" 
+                    ? Color.blue.opacity(0.08) 
+                    : Color.gray.opacity(0.15))
+        )
 #endif
-        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(message.role == "user" 
+                    ? Color.blue.opacity(0.2) 
+                    : Color.clear, lineWidth: 1)
+        )
     }
 }

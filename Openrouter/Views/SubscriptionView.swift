@@ -18,6 +18,7 @@ struct SubscriptionView: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showSuccess = false
 
     var body: some View {
         NavigationStack {
@@ -58,7 +59,43 @@ struct SubscriptionView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.blue)
                         }
+                        .accessibilityLabel("Restore previous purchases")
+                        .accessibilityHint("Restores any subscriptions you previously purchased")
                         .padding(.top, 16)
+                        
+                        // Terms and Privacy (Required by App Store)
+                        HStack(spacing: 8) {
+                            Button("Terms of Service") {
+                                // IMPORTANT: Replace with your actual Terms of Service URL before App Store submission
+                                if let url = URL(string: "https://github.com/dennismayr/openrouter-swiftui-app/blob/main/TERMS.md") {
+                                    #if os(iOS)
+                                    UIApplication.shared.open(url)
+                                    #elseif os(macOS)
+                                    NSWorkspace.shared.open(url)
+                                    #endif
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            
+                            Text("•")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Button("Privacy Policy") {
+                                // IMPORTANT: Replace with your actual Privacy Policy URL before App Store submission
+                                if let url = URL(string: "https://github.com/dennismayr/openrouter-swiftui-app/blob/main/PRIVACY.md") {
+                                    #if os(iOS)
+                                    UIApplication.shared.open(url)
+                                    #elseif os(macOS)
+                                    NSWorkspace.shared.open(url)
+                                    #endif
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 8)
                     }
 
                     Spacer()
@@ -80,16 +117,36 @@ struct SubscriptionView: View {
                 await subscriptionManager.checkSubscriptionStatus()
             }
             .alert("Purchase Error", isPresented: $showError) {
-                Button("OK") {}
+                Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage)
             }
+            .alert("Success!", isPresented: $showSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Your subscription is now active. Enjoy premium features!")
+            }
             .overlay {
                 if subscriptionManager.isLoading {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.1))
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                        
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+                            
+                            Text("Processing...")
+                                .foregroundColor(.white)
+                                .font(.headline)
+                        }
+                        .padding(24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.black.opacity(0.8))
+                        )
+                    }
                 }
             }
         }
@@ -107,6 +164,22 @@ struct SubscriptionView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
+                
+                // Allow users to manage subscription
+                Button(action: {
+                    if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                        #if os(iOS)
+                        UIApplication.shared.open(url)
+                        #elseif os(macOS)
+                        NSWorkspace.shared.open(url)
+                        #endif
+                    }
+                }) {
+                    Text("Manage Subscription")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+                .padding(.top, 8)
             }
             .padding()
 #if os(iOS)
@@ -220,8 +293,26 @@ struct SubscriptionView: View {
 
     private func purchase(product: Product) async {
         do {
-            try await subscriptionManager.purchaseMonthly() // or purchaseYearly based on product.id
+            if product.id == subscriptionManager.monthlyProductId {
+                try await subscriptionManager.purchaseMonthly()
+            } else if product.id == subscriptionManager.yearlyProductId {
+                try await subscriptionManager.purchaseYearly()
+            } else {
+                throw SubscriptionError.productNotFound
+            }
+            
+            #if os(iOS)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            #endif
+            
+            showSuccess = true
         } catch {
+            #if os(iOS)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+            #endif
+            
             errorMessage = error.localizedDescription
             showError = true
         }
@@ -230,7 +321,25 @@ struct SubscriptionView: View {
     private func restorePurchases() async {
         do {
             try await subscriptionManager.restorePurchases()
+            
+            // Show appropriate message based on result
+            if subscriptionManager.isSubscribed {
+                #if os(iOS)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                #endif
+                
+                showSuccess = true
+            } else {
+                errorMessage = "No previous purchases found."
+                showError = true
+            }
         } catch {
+            #if os(iOS)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+            #endif
+            
             errorMessage = error.localizedDescription
             showError = true
         }

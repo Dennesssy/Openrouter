@@ -11,6 +11,7 @@ import SwiftData
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var preferences: [UserPreferences]
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     @State private var apiKey = ""
     @State private var defaultTemperature = 0.7
@@ -19,8 +20,9 @@ struct SettingsView: View {
     @State private var showCostWarnings = true
     @State private var dailyBudgetLimit: Double = 5.0
     @State private var currencyCode = "USD"
-    @State private var isSubscribedToPremium = false
     @State private var showSubscriptionView = false
+    @State private var showClearConfirmation = false
+    @State private var isReimporting = false
 
     private var userPreferences: UserPreferences? {
         preferences.first
@@ -95,7 +97,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Premium Status")
                         Spacer()
-                        if isSubscribedToPremium {
+                        if subscriptionManager.isSubscribed {
                             Text("Active")
                                 .foregroundColor(.green)
                         } else {
@@ -106,7 +108,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    if isSubscribedToPremium {
+                    if subscriptionManager.isSubscribed {
                         Text("Premium features: Advanced analytics, export, custom ordering")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -120,8 +122,16 @@ struct SettingsView: View {
                     }
 
                     Button(action: reimportModels) {
-                        Text("Re-import Models")
+                        HStack {
+                            Text("Re-import Models")
+                            if isReimporting {
+                                Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
                     }
+                    .disabled(isReimporting)
                 }
 
                 Section("About") {
@@ -135,12 +145,28 @@ struct SettingsView: View {
 #endif
             .onAppear {
                 loadPreferences()
+                // Sync subscription status on appear
+                Task {
+                    await subscriptionManager.checkSubscriptionStatus()
+                    syncSubscriptionStatus()
+                }
             }
             .onDisappear {
                 savePreferences()
             }
             .sheet(isPresented: $showSubscriptionView) {
                 SubscriptionView()
+            }
+            .onChange(of: subscriptionManager.isSubscribed) { oldValue, newValue in
+                syncSubscriptionStatus()
+            }
+            .confirmationDialog("Clear All Data", isPresented: $showClearConfirmation) {
+                Button("Clear All Chat History", role: .destructive) {
+                    performClearAllData()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete all chat sessions, messages, and cost logs. This action cannot be undone.")
             }
         }
     }
@@ -160,8 +186,13 @@ struct SettingsView: View {
             costLimitPerSession = prefs.costLimitPerSession
             showCostWarnings = prefs.showCostWarnings
             currencyCode = prefs.currencyCode
-            isSubscribedToPremium = prefs.isSubscribedToPremium
         }
+    }
+    
+    private func syncSubscriptionStatus() {
+        guard var prefs = userPreferences else { return }
+        prefs.isSubscribedToPremium = subscriptionManager.isSubscribed
+        try? modelContext.save()
     }
 
     private func savePreferences() {
@@ -183,10 +214,10 @@ struct SettingsView: View {
             prefs.costLimitPerSession = costLimitPerSession
             prefs.showCostWarnings = showCostWarnings
             prefs.currencyCode = currencyCode
-            prefs.isSubscribedToPremium = isSubscribedToPremium
+            prefs.isSubscribedToPremium = subscriptionManager.isSubscribed
         } else {
             let newPrefs = UserPreferences()
-            newPrefs.isSubscribedToPremium = isSubscribedToPremium
+            newPrefs.isSubscribedToPremium = subscriptionManager.isSubscribed
             newPrefs.currencyCode = currencyCode
             newPrefs.dailyBudgetLimit = dailyBudgetLimit
             newPrefs.defaultTemperature = defaultTemperature
@@ -198,14 +229,64 @@ struct SettingsView: View {
 
         try? modelContext.save()
     }
-
+    
     private func clearAllData() {
-        // TODO: Implement clear all chat data
-        print("Clear all chat history")
+        showClearConfirmation = true
+    }
+    
+    private func performClearAllData() {
+        // Delete all chat sessions and messages
+        do {
+            let sessionDescriptor = FetchDescriptor<ChatSession>()
+            let sessions = try modelContext.fetch(sessionDescriptor)
+            
+            for session in sessions {
+                modelContext.delete(session)
+            }
+            
+            // Clear daily cost logs
+            let costLogDescriptor = FetchDescriptor<DailyCostLog>()
+            let costLogs = try modelContext.fetch(costLogDescriptor)
+            
+            for log in costLogs {
+                modelContext.delete(log)
+            }
+            
+            try modelContext.save()
+            print("Successfully cleared all chat history and cost logs")
+        } catch {
+            print("Error clearing data: \(error)")
+        }
     }
 
     private func reimportModels() {
-        // TODO: Implement re-import models
-        print("Re-import models")
+        Task {
+            isReimporting = true
+            defer { isReimporting = false }
+            
+            do {
+                guard let apiKey = try? KeychainManager.shared.getAPIKey() else {
+                    print("No API key available for model import")
+                    return
+                }
+                
+                let client = OpenRouterClient(apiKey: apiKey)
+                let importService = ModelImportService(client: client)
+                
+                // Delete existing models first
+                let modelDescriptor = FetchDescriptor<AIModel>()
+                let existingModels = try modelContext.fetch(modelDescriptor)
+                for model in existingModels {
+                    modelContext.delete(model)
+                }
+                try modelContext.save()
+                
+                // Re-import
+                let newModelNames = try await importService.importModels(into: modelContext)
+                print("Re-imported \(newModelNames.count) models")
+            } catch {
+                print("Error re-importing models: \(error)")
+            }
+        }
     }
 }

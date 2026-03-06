@@ -19,23 +19,38 @@ class SubscriptionManager: NSObject, ObservableObject {
     @Published var isLoading = false
     
     private let logger = Logger(subsystem: "com.openrouter.app", category: "Subscription")
+    
+    // Callback to sync with UserPreferences
+    var onSubscriptionStatusChanged: ((Bool) -> Void)?
 
     // Product IDs
     let monthlyProductId = "com.openrouter.premium.monthly"
     let yearlyProductId = "com.openrouter.premium.yearly"
+    
+    // Subscription group ID (configure in App Store Connect)
+    let subscriptionGroupId = "premium_subscriptions"
 
     private var products: [Product] = []
     private var updatesTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    enum SubscriptionState {
+    enum SubscriptionState: Equatable {
         case notSubscribed
         case subscribed(expirationDate: Date?)
-        case inGracePeriod(expirationDate: Date)
-        case inBillingRetryPeriod(expirationDate: Date)
-        case expired(expirationDate: Date)
-        case revoked
-        case unknown
+        case inGracePeriod(expirationDate: Date)  // Payment failed, but user retains access
+        case inBillingRetryPeriod(expirationDate: Date)  // System is retrying payment
+        case expired(expirationDate: Date)  // Subscription ended
+        case revoked  // Refund or other issue caused revocation
+        case unknown  // Unable to determine status
+        
+        var allowsPremiumAccess: Bool {
+            switch self {
+            case .subscribed, .inGracePeriod, .inBillingRetryPeriod:
+                return true
+            case .notSubscribed, .expired, .revoked, .unknown:
+                return false
+            }
+        }
     }
 
     override init() {
@@ -58,8 +73,8 @@ class SubscriptionManager: NSObject, ObservableObject {
         defer { isLoading = false }
 
         do {
-            products = try await Product.products(for: [monthlyProductId, yearlyProductId])
-            logger.info("Loaded \(products.count) products")
+            self.products = try await Product.products(for: [monthlyProductId, yearlyProductId])
+            logger.info("Loaded \(self.products.count) products")
         } catch {
             logger.error("Failed to load products: \(error.localizedDescription)")
         }
@@ -83,9 +98,9 @@ class SubscriptionManager: NSObject, ObservableObject {
                     let transaction = try self.checkVerified(result)
                     await transaction.finish()
                     await self.checkSubscriptionStatus()
-                    logger.info("Transaction finished: \(transaction.productID)")
+                    self.logger.info("Transaction finished: \(transaction.productID)")
                 } catch {
-                    logger.error("Transaction update failed: \(error.localizedDescription)")
+                    self?.logger.error("Transaction update failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -93,74 +108,94 @@ class SubscriptionManager: NSObject, ObservableObject {
 
     func checkSubscriptionStatus() async {
         do {
-            // Get entitlements (current valid subscriptions)
-            var subscribedProductIDs: Set<String> = []
-            var expirationDates: [String: Date] = [:]
-
-            for await entitlement in Transaction.currentEntitlements {
-                switch entitlement {
-                case .verified(let transaction):
-                    subscribedProductIDs.insert(transaction.productID)
-                    
-                    // Get expiration date based on product type
-                    if let expirationDate = calculateExpirationDate(for: transaction) {
-                        expirationDates[transaction.productID] = expirationDate
+            // Use the new currentEntitlements(for:) API for more efficient checking
+            var hasActiveSubscription = false
+            var status: Product.SubscriptionInfo.Status? = nil
+            
+            // Check monthly subscription
+            for await verificationResult in Transaction.currentEntitlements(for: monthlyProductId) {
+                if case .verified = verificationResult {
+                    hasActiveSubscription = true
+                    if let product = monthlyProduct,
+                       let subscription = product.subscription,
+                       let productStatus = try await subscription.status.first {
+                        status = productStatus
                     }
-                    
-                case .unverified(let transaction):
-                    logger.debug("Unverified transaction for \(transaction.productID)")
-                    continue
+                    break
+                }
+            }
+            
+            // Check yearly subscription if no monthly found
+            if !hasActiveSubscription {
+                for await verificationResult in Transaction.currentEntitlements(for: yearlyProductId) {
+                    if case .verified = verificationResult {
+                        hasActiveSubscription = true
+                        if let product = yearlyProduct,
+                           let subscription = product.subscription,
+                           let productStatus = try await subscription.status.first {
+                            status = productStatus
+                        }
+                        break
+                    }
                 }
             }
 
-            // Check subscription status via Product.SubscriptionInfo.Status
-            if let product = monthlyProduct, let subscription = product.subscription {
-                let statuses = try await subscription.status.filter { subscribedProductIDs.contains($0.transaction.productID) }
-
-                if let status = statuses.first {
-                    let state = status.state
-                    
-                    switch state {
-                    case .subscribed:
-                        isSubscribed = true
-                        subscriptionStatus = .subscribed(expirationDate: status.renewalInfo.expirationDate)
-                        logger.info("Subscription active, renews on: \(status.renewalInfo.expirationDate?.description ?? "unknown")")
-                        
-                    case .inGracePeriod:
-                        isSubscribed = true  // Still allow access during grace period
-                        let expiration = status.renewalInfo.expirationDate ?? Date()
-                        subscriptionStatus = .inGracePeriod(expirationDate: expiration)
-                        logger.warning("Subscription in grace period, expires: \(expiration)")
-                        
-                    case .inBillingRetryPeriod:
-                        isSubscribed = true  // Still allow access during retry period
-                        let expiration = status.renewalInfo.expirationDate ?? Date()
-                        subscriptionStatus = .inBillingRetryPeriod(expirationDate: expiration)
-                        logger.warning("Subscription in billing retry, expires: \(expiration)")
-                        
-                    case .expired:
-                        isSubscribed = false
-                        let expiration = status.renewalInfo.expirationDate ?? Date()
-                        subscriptionStatus = .expired(expirationDate: expiration)
-                        logger.notice("Subscription expired on: \(expiration)")
-                        
-                    case .revoked:
-                        isSubscribed = false
-                        subscriptionStatus = .revoked
-                        logger.error("Subscription was revoked")
-                        
-                    @unknown default:
-                        isSubscribed = false
-                        subscriptionStatus = .unknown
-                        logger.warning("Unknown subscription state")
+            let previousSubscriptionState = isSubscribed
+            
+            if let status = status {
+                let state = status.state
+                
+                // Get expiration date from the transaction
+                let expirationDate: Date? = {
+                    switch status.transaction {
+                    case .verified(let transaction):
+                        return transaction.expirationDate
+                    case .unverified(let transaction, _):
+                        // Even unverified transactions can provide expiration date
+                        return transaction.expirationDate
                     }
-                } else {
+                }()
+                
+                // Use if-else because RenewalState is a struct, not an enum
+                if state == .subscribed {
+                    isSubscribed = true
+                    subscriptionStatus = .subscribed(expirationDate: expirationDate)
+                    logger.info("Subscription active, renews on: \(expirationDate?.description ?? "unknown")")
+                } else if state == .inGracePeriod {
+                    isSubscribed = true  // Still allow access during grace period
+                    let expiration = expirationDate ?? Date()
+                    subscriptionStatus = .inGracePeriod(expirationDate: expiration)
+                    logger.warning("Subscription in grace period, expires: \(expiration)")
+                } else if state == .inBillingRetryPeriod {
+                    // Per Apple docs, billing retry period does NOT grant entitlement
+                    // However, we choose to maintain access for better UX
+                    isSubscribed = true
+                    let expiration = expirationDate ?? Date()
+                    subscriptionStatus = .inBillingRetryPeriod(expirationDate: expiration)
+                    logger.warning("Subscription in billing retry, expires: \(expiration)")
+                } else if state == .expired {
                     isSubscribed = false
-                    subscriptionStatus = .notSubscribed
+                    let expiration = expirationDate ?? Date()
+                    subscriptionStatus = .expired(expirationDate: expiration)
+                    logger.notice("Subscription expired on: \(expiration)")
+                } else if state == .revoked {
+                    isSubscribed = false
+                    subscriptionStatus = .revoked
+                    logger.error("Subscription was revoked")
+                } else {
+                    // Unknown state
+                    isSubscribed = false
+                    subscriptionStatus = .unknown
+                    logger.warning("Unknown subscription state")
                 }
             } else {
                 isSubscribed = false
                 subscriptionStatus = .notSubscribed
+            }
+            
+            // Notify if subscription status changed
+            if previousSubscriptionState != isSubscribed {
+                onSubscriptionStatusChanged?(isSubscribed)
             }
 
         } catch {
@@ -206,6 +241,9 @@ class SubscriptionManager: NSObject, ObservableObject {
             logger.info("Purchase successful, verifying...")
             let transaction = try checkVerified(verification)
             
+            // Log successful purchase
+            logger.notice("✅ Purchase completed: \(product.id)")
+            
             // Deliver content immediately for verified transaction
             await transaction.finish()
             await checkSubscriptionStatus()
@@ -246,7 +284,7 @@ class SubscriptionManager: NSObject, ObservableObject {
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
-        case .unverified(let unverifiedResult):
+        case .unverified(_, _):
             // In production, you might want to verify with your server
             // For now, we reject unverified transactions
             logger.error("Transaction verification failed - possible tampering detected")
@@ -297,6 +335,23 @@ class SubscriptionManager: NSObject, ObservableObject {
 
     var canAccessPremiumFeatures: Bool {
         isSubscribed
+    }
+    
+    // Check if subscription is shared via Family Sharing
+    func isSubscriptionShared() async -> Bool {
+        for await entitlement in Transaction.currentEntitlements(for: monthlyProductId) {
+            if case .verified(let transaction) = entitlement {
+                return transaction.ownershipType == .familyShared
+            }
+        }
+        
+        for await entitlement in Transaction.currentEntitlements(for: yearlyProductId) {
+            if case .verified(let transaction) = entitlement {
+                return transaction.ownershipType == .familyShared
+            }
+        }
+        
+        return false
     }
 }
 
