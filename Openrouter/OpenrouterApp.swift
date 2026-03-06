@@ -65,6 +65,15 @@ struct OpenrouterApp: App {
 
     /// Imports the bundled model catalog. Detects and notifies about new models.
     private func importModelsIfNeeded() async {
+        // Check if initial import has been completed
+        let hasCompletedInitialImport = UserDefaults.standard.bool(forKey: "hasCompletedInitialModelImport")
+        
+        // Only perform initial import once, or if user explicitly requests re-import
+        if hasCompletedInitialImport {
+            print("Skipping model import - already completed initial import")
+            return
+        }
+        
         appState.isImportingModels = true
         do {
             // Get API key for model import
@@ -87,6 +96,10 @@ struct OpenrouterApp: App {
             if !newModelNames.isEmpty {
                 appState.handleNewModels(newModelNames)
             }
+            
+            // Mark initial import as complete
+            UserDefaults.standard.set(true, forKey: "hasCompletedInitialModelImport")
+            print("Initial model import completed successfully")
         } catch let error as OpenRouterError {
             // Handle specific OpenRouter errors with user-friendly messages
             print("Model import failed: \(error)")

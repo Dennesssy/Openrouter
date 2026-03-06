@@ -16,6 +16,7 @@ struct ChatView: View {
     @State private var budgetAlertMessage = ""
     @State private var showErrorAlert = false
     @State private var errorAlertMessage = ""
+    @State private var costEstimationTask: Task<Void, Never>?
 
     private var userPreferences: UserPreferences? {
         preferences.first
@@ -231,7 +232,7 @@ struct ChatView: View {
                                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                         )
                         .onChange(of: messageText) { _, _ in
-                            updateCostEstimation()
+                            debouncedCostEstimation()
                         }
                 }
 
@@ -298,17 +299,37 @@ struct ChatView: View {
         }
     }
 
+    private func debouncedCostEstimation() {
+        // Cancel previous task
+        costEstimationTask?.cancel()
+        
+        // Create new task with 300ms debounce
+        costEstimationTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+            
+            guard !Task.isCancelled else { return }
+            
+            await MainActor.run {
+                updateCostEstimation()
+            }
+        }
+    }
+    
     private func updateCostEstimation() {
         guard let pricing = session.model?.pricing else {
             estimatedCost = 0.0
             return
         }
 
+        // Constants for estimation
+        let charactersPerToken = 4.0
+        let estimatedResponseTokens = 100
+        
         // Rough estimation: assume 4 characters per token
-        let estimatedTokens = Double(messageText.count) / 4.0
+        let estimatedTokens = Double(messageText.count) / charactersPerToken
         estimatedCost = pricing.calculateCost(
             promptTokens: Int(estimatedTokens),
-            completionTokens: 100 // Rough estimate for response
+            completionTokens: estimatedResponseTokens
         )
     }
 
@@ -428,18 +449,55 @@ struct ChatView: View {
                         checkBudgetAlerts()
                     }
                 }
+            } catch let error as OpenRouterError {
+                await MainActor.run {
+                    isLoading = false
+                    messageText = currentMessage
+                    
+                    // Show user-friendly error based on OpenRouterError type
+                    var userMessage: String
+                    switch error {
+                    case .authenticationError:
+                        userMessage = "Authentication failed. Please check your API key in Settings."
+                    case .rateLimitError(let retryAfter):
+                        if let retry = retryAfter {
+                            userMessage = "Rate limit exceeded. Please try again in \(Int(retry)) seconds."
+                        } else {
+                            userMessage = "Rate limit exceeded. Please try again in a moment."
+                        }
+                    case .insufficientCredits:
+                        userMessage = "Insufficient credits. Please add credits to your OpenRouter account."
+                    case .networkError(let netError):
+                        userMessage = "Network error: \(netError.localizedDescription)"
+                    case .apiError(let code, let message, _):
+                        userMessage = "API Error (\(code)): \(message)"
+                    case .invalidResponse:
+                        userMessage = "Received invalid response from server. Please try again."
+                    case .decodingError:
+                        userMessage = "Failed to parse server response. The API may be experiencing issues."
+                    }
+                    
+                    errorAlertMessage = userMessage
+                    showErrorAlert = true
+                    
+                    // Also add error to chat for context
+                    let errorMessage = ChatMessage.assistantMessage(
+                        "❌ Error: \(userMessage)",
+                        tokenCount: 0,
+                        cost: 0.0
+                    )
+                    session.addMessage(errorMessage)
+                }
             } catch {
                 await MainActor.run {
-                    // TODO: Show error to user
-                    print("Error sending message: \(error)")
                     isLoading = false
-
-                    // Restore message text so user can retry
                     messageText = currentMessage
-
-                    // Add error message to chat
+                    
+                    errorAlertMessage = "An unexpected error occurred: \(error.localizedDescription)"
+                    showErrorAlert = true
+                    
                     let errorMessage = ChatMessage.assistantMessage(
-                        "Sorry, I encountered an error: \(error.localizedDescription)",
+                        "❌ Unexpected error: \(error.localizedDescription)",
                         tokenCount: 0,
                         cost: 0.0
                     )

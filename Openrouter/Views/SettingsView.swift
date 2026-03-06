@@ -281,8 +281,15 @@ struct SettingsView: View {
                 }
                 try modelContext.save()
                 
+                // Reset the import flag so it can re-import
+                UserDefaults.standard.set(false, forKey: "hasCompletedInitialModelImport")
+                
                 // Re-import
                 let newModelNames = try await importService.importModels(into: modelContext)
+                
+                // Mark as complete again
+                UserDefaults.standard.set(true, forKey: "hasCompletedInitialModelImport")
+                
                 print("Re-imported \(newModelNames.count) models")
             } catch {
                 print("Error re-importing models: \(error)")
